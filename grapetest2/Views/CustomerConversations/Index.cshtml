@@ -1,0 +1,161 @@
+﻿@model List<CustomerConversation>
+@{
+  ViewData["Title"] = "Customer conversations";
+
+  string url = (Context.Request.IsHttps ? "https://" : "http://") + Context.Request.Host + Context.Request.Path;
+  string danger_row = "alert-danger";
+  string active_row = "table-active";
+}
+
+<h2>Customer conversations - Operator</h2>
+
+@if (User.Identity.IsAuthenticated)
+{
+  <script src="~/lib/signalr/signalr.min.js"></script>
+}
+
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Last modified</th>
+      <th scope="col">Created</th>
+      <th scope="col">Unanswered</th>
+      <th scope="col">Is closed?</th>
+    </tr>
+  </thead>
+  <tbody id="customerConversationTableBody">
+
+    @for (int i = 0; i < Model.Count; i++)
+    {
+      <tr id="connection_@Model[i].ConnectionId" class="@(@Model[i].Unanswered ? danger_row : active_row)">
+        <td scope="row">@Model[i].LastModified.ToLocalTime()</td>
+        <td>@Model[i].Created.ToLocalTime()</td>
+        <td>@Model[i].Unanswered.ToString().ToLower()</td>
+        <td>@Model[i].Closed.ToString().ToLower()</td>
+      </tr>
+    }
+
+  </tbody>
+</table>
+<script src="~/js/ChatModal.js"></script>
+<script type="text/javascript">
+
+  var timer;
+  var timerSeconds = 2000;
+  var url = "@url";
+  var chatModalList = [];
+  var connection;
+
+  function clickInRow(rowElement) {
+
+    var connection_id = $(rowElement).attr('id').replace('connection_', '');
+
+    if (chatModalList.findIndex(cm => cm.id == connection_id) == -1) {
+      // new chat modal
+      var offset = chatModalList.length * 320;
+
+      $.get(url + "/GetConversationMessages", { connectionId: connection_id }, function (contents, status) {
+
+        var chatModal = new ChatModal(document.body, connection_id, contents, offset, function () {
+          var message = chatModal.getTypedMessage();
+          if (message) {
+            var connectionId = chatModal.id;
+            connection.invoke("MessageFromOperator", connectionId, message).catch(err => console.error(err.toString()));
+            var created_string = new Date().toLocaleDateString("hu-HU") + " " + new Date().toLocaleTimeString("hu-HU");    
+            chatModal.addNewMessage({ fromcustomer: false, created: created_string, content: message });
+            chatModal.clearInput();
+          }
+     
+        }, function (main) {
+          // destroy
+          var id = $(main).attr('id').replace('chat_', '');
+          var index = chatModalList.findIndex(cm => cm.id === id);    
+          if (index !== -1) {
+            chatModalList[index].destroy();
+            chatModalList.splice(index, 1);
+            // recalculate chat windows position
+          }
+        });
+        chatModalList.push(chatModal);
+      });
+    }
+    // remove last and create new
+    else if (chatModalList.length == 4) {
+      chatModalList[3].destroy();
+      chatModalList.splice(3, 1);
+    }
+
+  }
+
+  function addNewElementsToTable(modifiedConversations) {
+
+    var conversationsTableBody = $("#customerConversationTableBody");
+
+    if (conversationsTableBody.length > 0) {
+      conversationsTableBody = conversationsTableBody[0];
+
+      for (var i = 0; i < modifiedConversations.length; i++) {
+
+        var conversationRow = $(conversationsTableBody).find("#connection_" + modifiedConversations[i].connectionid);
+        if (conversationRow.length === 0) {
+          var row = $('<tr>');
+          if (modifiedConversations[i].unanswered) row.addClass("@danger_row");
+          row.attr('id', 'connection_' + modifiedConversations[i].connectionid);
+          row.append($('<td>').text(modifiedConversations[i].lastmodified));
+          row.append($('<td>').text(modifiedConversations[i].created));
+          row.append($('<td>').text(modifiedConversations[i].unanswered));
+          row.append($('<td>').text(modifiedConversations[i].closed));
+          row.click(function () { clickInRow(this); });
+          $(conversationsTableBody).append(row);
+        }
+        else {
+          var td_list = $(conversationRow[0]).find("td");
+          if (td_list.length >= 4) {
+            $(td_list[0]).text(modifiedConversations[i].lastmodified);
+            $(td_list[1]).text(modifiedConversations[i].created);
+            $(td_list[2]).text(modifiedConversations[i].unanswered);
+            $(td_list[3]).text(modifiedConversations[i].closed);
+
+            if (modifiedConversations[i].unanswered) $(conversationRow[0]).addClass("@danger_row");
+            else $(conversationRow[0]).removeClass("@danger_row");
+          }
+        }
+      }
+    }
+  }
+
+  function refreshCustomerConversationTable() {
+    $.get(url + "/GetModified", { }, function (modifiedConversations, status) {
+      if (modifiedConversations.length > 0) addNewElementsToTable(modifiedConversations);
+      timer = setTimeout(refreshCustomerConversationTable, timerSeconds);
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", function (event) {
+
+    var rows = $("#customerConversationTableBody").find('tr');
+    rows.each(function () {
+      $(this).click(function () {
+        clickInRow(this);
+      });
+    });
+
+    connection = new signalR.HubConnectionBuilder()
+      .withUrl("/chatHub")
+      .build();
+
+    connection.start(function () {
+    }).catch(err => console.error(err.toString()));
+
+    connection.on("ReceiveMessage", (connection_id, messageItem) => {
+      var index = chatModalList.findIndex(cm => cm.id === connection_id);    
+      if (index > -1) 
+        chatModalList[index].addNewMessage(messageItem);  
+    });
+
+    timer = setTimeout(function () {
+      timer = setTimeout(refreshCustomerConversationTable, timerSeconds);
+    }, timerSeconds);
+  });
+
+</script>

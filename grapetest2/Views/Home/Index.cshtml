@@ -1,0 +1,47 @@
+﻿@using Microsoft.AspNetCore.Identity
+
+@{
+  ViewData["Title"] = "Home Page";
+}
+
+@inject SignInManager<IdentityUser> SignInManager
+<div>
+
+  <div class="jumbotron">
+
+
+    <div class="container">
+
+      <div class="row">
+        <div class="panel panel-default">
+          <div class="panel-heading">Use this username and password to login:</div>
+          <div class="panel-body">
+            <form class="container">
+              <div class="form-group row">
+                <label class="col-sm-1 col-form-label">Email</label>
+                <div class="col-sm-10">
+                  <span>operator@test.hu</span>
+                </div>
+              </div>
+              <div class="form-group row">
+                <label class="col-sm-1 col-form-label">Password</label>
+                <div class="col-sm-10">
+                  <span>operator</span>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  @if (!SignInManager.IsSignedIn(User))
+  {
+    <a class="btn btn-primary btn-lg navbar-btn" 
+       asp-controller="Home" asp-action="ChatForCustomers"  role="button">Chat for customers</a>
+  }
+
+</div>
