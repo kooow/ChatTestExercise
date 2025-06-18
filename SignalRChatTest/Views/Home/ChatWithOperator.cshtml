@@ -1,0 +1,99 @@
+﻿@using Microsoft.AspNetCore.Identity
+
+@{
+   ViewData["Title"] = "Chat with customer";
+}
+
+@inject SignInManager<IdentityUser> SignInManager
+
+<h2>Chat with operator</h2>
+
+<div id="customerChatDiv" class="main-section open-more">
+  <div class="row border-chat">
+    <div class="col-md-12 col-sm-12 col-xs-12 first-section">
+      <div class="row">
+        <div class="col-md-8 col-sm-6 col-xs-6 left-first-section">
+          <p>Chat</p>
+        </div>
+      </div>
+    </div>
+  </div><div class="row border-chat">
+    <div class="col-md-12 col-sm-12 col-xs-12 second-section">
+      <div class="chat-section">
+        <ul id="chatMessagesList">
+          <li>
+            <div class="right-chat">
+              <p>Hello, how may I help you today?</p>
+              <span>@DateTime.Now.ToShortDateString() @DateTime.Now.ToShortTimeString()</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="row border-chat">
+    <div class="col-md-12 col-sm-12 col-xs-12 third-section">
+      <div class="text-bar">
+        <input id="message" type="text" placeholder="Write message">
+        <button type="button" class="btn btn-primary btn-sm" id="sendButton">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+@if (!User.Identity.IsAuthenticated)
+{
+  <script src="~/lib/signalr/signalr.min.js"></script>
+}
+
+
+<script type="text/javascript">
+
+  // refactor - use ChatModal component
+
+  document.addEventListener("DOMContentLoaded", function (event) {
+
+    const connection = new signalR.HubConnectionBuilder()
+      .withUrl("/chatHub")
+      .build();
+
+    connection.start(function () {
+      continueToChat();
+    }).catch(err => console.error(err.toString()));
+
+    connection.on('Send', (nick, message) => {
+      appendLine(nick, message);
+    });
+
+    connection.on("ReceiveMessage", (connection_id, message) => {
+      appendLine(message);
+    }); 
+
+    document.getElementById('sendButton').addEventListener('click', event => {
+      let message = $('#message').val();
+
+      connection.invoke("MessageFromCustomer", message).catch(err => console.error(err.toString()));
+      var created_string = new Date().toLocaleDateString("hu-HU") + " " + new Date().toLocaleTimeString("hu-HU");  
+      appendLine({ content: message, fromcustomer: true, created: created_string });
+
+      $('#message').val('');
+
+      event.preventDefault();
+    });
+
+    function getMessageItemContent(messageItem) {
+      return `<li><div class="${(messageItem.fromcustomer ? 'left-chat' : 'right-chat')}">
+                <p>${messageItem.content}</p>
+                <span>${messageItem.created}</span>
+              </div></li>`;
+    }
+
+    function appendLine(messageItem) {
+      var content = getMessageItemContent(messageItem);
+      $('#chatMessagesList').append(content);
+    };
+
+  });
+
+</script>
