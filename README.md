@@ -21,3 +21,5 @@ ASP.NET Core 2.1 SingalR Chat Test
 4. Write something and click to the send button
 5. You can click on the new row in the CustomerConversations table with operator
 6. After the click, the row will be selected and you can write a response to the customer
+
+![chat_test_exercise_screenshot](https://github.com/user-attachments/assets/809c8bed-ec76-4173-a736-d1f14d6109a6)
